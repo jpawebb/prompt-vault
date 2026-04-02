@@ -1,16 +1,30 @@
+from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import StaticPool
 from core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.app_env == "development",
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+
+def _make_engine():
+    url = settings.database_url
+    if url.startswith("sqlite+aiosqlite://"):
+        return create_async_engine(
+            url,
+            echo=settings.app_env == "development",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    return create_async_engine(
+        url,
+        echo=settings.app_env == "development",
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+    )
+
+engine = _make_engine()
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -23,7 +37,7 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session

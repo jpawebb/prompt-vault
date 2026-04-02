@@ -64,4 +64,39 @@ class RenderResponse(BaseModel):
     name: str
     version: int
     rendered: str
+
+
+class ExecuteRequest(BaseModel):
+    variables: dict[str, Any] = Field(default_factory=dict)
+    max_tokens: int = Field(default=1024, ge=1, le=8096)
+    system_prompt: str | None = None
  
+ 
+class ExecutionRead(BaseModel):
+    id: int
+    prompt_id: int
+    input_vars: dict[str, Any]
+    rendered_prompt: str
+    raw_output: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    latency_ms: float | None
+    model: str | None
+    status: str
+    error: str | None
+    created_at: datetime
+ 
+    model_config = {"from_attributes": True}
+ 
+ 
+class ExecuteResponse(BaseModel):
+    execution_id: int
+    prompt_name: str
+    prompt_version: int
+    rendered_prompt: str
+    output: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    latency_ms: float | None
+    model: str
+    status: str
