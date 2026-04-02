@@ -34,11 +34,11 @@ class AnthropicExecutor:
     """
 
     def __init__(self, renderer: PromptRenderer):
-        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         self._renderer = renderer
         self._model = settings.anthropic_model
 
-    def render_and_execute(
+    async def render_and_execute(
         self,
         prompt_id: int,
         template: str,
@@ -73,7 +73,7 @@ class AnthropicExecutor:
 
         start = time.monotonic()
         try:
-            response = self._client.messages.create(**kwargs)
+            response = await self._client.messages.create(**kwargs)
             latency_ms = (time.monotonic() - start) * 1000
 
             output_text = "".join(
