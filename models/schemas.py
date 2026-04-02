@@ -11,7 +11,7 @@ class PromptCreate(BaseModel):
     template: str = Field(..., min_length=1)
     tags: list[str] = Field(default_factory=list)
  
-    @field_validator("name")
+    @field_validator("name", mode="before")
     @classmethod
     def name_must_be_slug(cls, v: str) -> str:
         return v.strip().lower()
