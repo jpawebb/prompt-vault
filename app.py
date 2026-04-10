@@ -204,7 +204,7 @@ with tab1:
 
                 c1, c2 = st.columns([1, 5])
                 with c1:
-                    if st.button(f"🗑️ Delete", key=f"del_{row["id"]}"):
+                    if st.button("🗑️ Delete", key=f"del_{row['id']}"):
                         delete_prompt(row["id"])
                         st.rerun()
                 
