@@ -1,84 +1,61 @@
 import re
-from typing import Any
-from jinja2 import (
-    Environment,
-    StrictUndefined,
-    TemplateSyntaxError,
-    UndefinedError,
-    meta,
+from typing import Optional
+
+from jinja2 import BaseLoader, Environment, TemplateSyntaxError, UndefinedError
+
+# {{ var }} pattern, must start with a non-digit and contain only letters, digits, and underscores
+_SIMPLE_VAR_RE = re.compile(r'\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}')
+
+_env = Environment(
+    loader=BaseLoader(),
+    keep_trailing_newline=True,
+    autoescape=False,
 )
 
-class PromptRenderError(Exception):
-    pass
+def extract_variables(text: str) -> set[str]:
+    """Return an ordered, list of simple {{ variable }} names.
 
+    Only bare identifiers are returned - dot-access expressions like 
+    {{ user.name }} returned as {{ user }}.
 
-class PromptRenderer:
+    Examples:
+        >>> extract_variables("Hello {{ name }}!")
+        ["name"]
+        >>> extract_variables("No variables here.")
+        []
     """
-    Renders Jinja2 prompt templates with strict undefined-variable handling.
- 
-    Features:
-    - StrictUndefined: any missing variable raises immediately — no silent blanks.
-    - extract_variables: statically parses a template string for declared variables.
-    - supports filters, conditionals, loops — full Jinja2 feature set.
+    seen: set[str] = set()
+    variables: list[str] = []
+
+    for match in _SIMPLE_VAR_RE.finditer(text):
+        var = match.group(1)
+        if var not in seen:
+            seen.add(var)
+            variables.append(var)
+    return variables
+
+
+def render_prompt(text: str, context: dict[str, str]) -> tuple[str, Optional[str]]:
+    """Render *text* as a Jinja2 template with *context*.
+
+    Returns:
+        (rendered, None)        on success.
+        ("", error_message)     on failure.
+    
+    Examples:
+        >>> render_prompt("Hello {{ name }}!", {"name": "Alice"})
+        ("Hello Alice!", None)
+        >>> render_prompt("Hello {{ name }}!", {})
+        ("", "Undefined variable: 'name'")
     """
- 
-    def __init__(self):
-        self._env = Environment(
-            undefined=StrictUndefined,
-            keep_trailing_newline=True,
-            trim_blocks=True,
-            lstrip_blocks=True,
-        )
-
-
-    def render(self, template_str: str, variables: dict[str, Any]) -> str:
-        """
-        Render a Jinja2 template string with the provided variables.
- 
-        Raises:
-            PromptRenderError: on syntax errors or missing variables.
-        """
-        try:
-            template = self._env.from_string(template_str)
-            return template.render(**variables)
-        except TemplateSyntaxError as e:
-            raise PromptRenderError(
-                f"Template syntax error at line {e.lineno}: {e.message}"
-            ) from e
-        except UndefinedError as e:
-            raise PromptRenderError(
-                f"Missing template variable: {e.message}"
-            ) from e
-
-
-    def extract_variables(self, template_str: str) -> list[str]:
-        """
-        Statically extract all referenced variable names from a template string.
-        Used to populate `input_variables` on Prompt creation.
-        """
-        try:
-            ast = self._env.parse(template_str)
-            variables = meta.find_undeclared_variables(ast)
-            return sorted(variables)
-        except TemplateSyntaxError as e:
-            raise PromptRenderError(
-                f"Cannot parse template for variable extraction: {e.message}"
-            ) from e
-        
-
-    def validate_template(self, template_str: str) -> None:
-        """
-        Validate template syntax without rendering.
- 
-        Raises:
-            PromptRenderError: if the template has syntax errors.
-        """
-        try:
-            self._env.parse(template_str)
-        except TemplateSyntaxError as e:
-            raise PromptRenderError(
-                f"Invalid template syntax at line {e.lineno}: {e.message}"
-            ) from e
-
-
-renderer = PromptRenderer()
+    try:
+        template = _env.from_string(text)
+        rendered = template.render(context)
+        return rendered, None
+    
+    except TemplateSyntaxError as e:
+        return "", f"Syntax error in template: {e.message}"
+    except UndefinedError as e:
+        return "", f"Undefined variable: {e.message}"
+    except Exception as e:
+        return "", f"Error rendering template: {str(e)}"
